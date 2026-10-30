@@ -5,7 +5,7 @@ import {
   SIDE_GALLERY_BTN, SIDE_BACK_BTN, currentBoard, resetMatchState,
   toStageXY, isInside, nodeCenter, showToast, showStamp, spawnLandingEffect,
   unlockBoardCards, equipAllCharms, getSelectBoardRect, getGalleryCardRect,
-  saveProfile,
+  BOARD_RECT, saveProfile,
 } from './state.js';
 import {
   BOARDS, UKIYOE_CARDS, CHARMS, getBoard,
@@ -471,7 +471,19 @@ function update(dt) {
       anim.lastSeg = seg;
       audio.step();
     }
+    // V2 camera: zoom 1 -> 1.22 and track the moving pawn.
+    const next = anim.path[Math.min(anim.path.length - 1, seg + 1)] || anim.path[anim.path.length - 1];
+    const cur = anim.path[seg >= 0 ? seg : 0] || next;
+    G.camera.focus = { x: (cur.x + next.x) / 2, y: (cur.y + next.y) / 2 - 6 };
+    G.camera.zoom = 1 + 0.22 * p;
     if (p >= 1) finishMove();
+  }
+  // Restore the overview camera after movement ends.
+  if (G.phase !== 'MOVE' || !G.pieceAnim) {
+    const bx = BOARD_RECT.x + BOARD_RECT.w / 2;
+    const by = BOARD_RECT.y + BOARD_RECT.h / 2;
+    G.camera.focus = { x: bx + (G.camera.focus.x - bx) * 0.12, y: by + (G.camera.focus.y - by) * 0.12 };
+    G.camera.zoom = Math.min(1.0, G.camera.zoom + (1 - G.camera.zoom) * 0.18);
   }
   if (G.phase === 'ROLL' && G.match?.winner < 0 && G.match?.turn !== G.match?.humanSide) {
     if (G.aiTimer <= 0.001) {

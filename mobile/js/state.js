@@ -15,9 +15,12 @@ export let offsetX = 0;
 export let offsetY = 0;
 
 export const LEFT_PANEL = { x: 14, y: 68, w: 166, h: 664 };
-export const BOARD_RECT = { x: 190, y: 68, w: 800, h: 664 };
-export const RIGHT_PANEL = { x: 1002, y: 68, w: 264, h: 664 };
-export const BOARD_SURFACE = { x: 196, y: 92, w: 788, h: 640 };
+export const BOARD_RECT = { x: 28, y: 60, w: 944, h: 710 };
+export const RIGHT_PANEL = { x: 972, y: 60, w: 290, h: 710 };
+export const BOARD_SURFACE = { x: 28, y: 60, w: 944, h: 710 };
+// Scale factor mapping the 800x640 local node space to the enlarged print surface.
+export const BOARD_SCALE_X = BOARD_SURFACE.w / 800;
+export const BOARD_SCALE_Y = BOARD_SURFACE.h / 640;
 
 export const PLAY_BUTTONS = {
   gallery: { x: 24, y: 592, w: 146, h: 34 },
@@ -147,6 +150,10 @@ export const G = {
   kesshuPieces: 0,
   genjiBalance: 0,
   tokaidoGourmet: [],
+  // V2 camera: smooth zoom & follow tracked over the board during movement.
+  camera: { zoom: 1, focus: { x: 600, y: 400 } },
+  cutIn: null,
+  hop: { seg: -1, path: null },
   stats: { turns: 0, jumps: 0, duels: 0, cards: 0 },
   lastResult: null,
   banner: '江戸浮世絵・絵双六',
@@ -184,6 +191,9 @@ export function resetMatchState() {
   G.kesshuPieces = 0;
   G.genjiBalance = 0;
   G.tokaidoGourmet = [];
+  G.camera = { zoom: 1, focus: { x: BOARD_RECT.x + BOARD_RECT.w / 2, y: BOARD_RECT.y + BOARD_RECT.h / 2 } };
+  G.cutIn = null;
+  G.hop = { seg: -1, path: null };
   G.stats = { turns: 0, jumps: 0, duels: 0, cards: 0 };
   G.newCards = [];
   G.lastResult = null;
@@ -243,7 +253,10 @@ export function spawnLandingEffect(tx, ty, kind = 'gold', label = '') {
 }
 
 export function nodeCenter(node) {
-  return { x: BOARD_RECT.x + node.x + node.w / 2, y: BOARD_RECT.y + node.y + node.h / 2 };
+  return {
+    x: BOARD_SURFACE.x + node.x * BOARD_SCALE_X + node.w * BOARD_SCALE_X / 2,
+    y: BOARD_SURFACE.y + node.y * BOARD_SCALE_Y + node.h * BOARD_SCALE_Y / 2,
+  };
 }
 
 export function pawnPosition(side) {
@@ -251,9 +264,9 @@ export function pawnPosition(side) {
   const pos = G.match?.pos?.[side] ?? board.start;
   const node = board.nodes[pos] || board.nodes[board.goal];
   const base = nodeCenter(node);
-  const sideOffset = side === 0 ? -12 : 12;
-  const stack = side === 0 ? 2 : -2;
-  return { x: base.x + sideOffset, y: base.y + node.h * 0.25 + stack };
+  const sideOffset = side === 0 ? -14 : 14;
+  const stack = side === 0 ? 3 : -3;
+  return { x: base.x + sideOffset, y: base.y + node.h * BOARD_SCALE_Y * 0.24 + stack };
 }
 
 export function getSelectBoardRect(index) {

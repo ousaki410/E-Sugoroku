@@ -1,7 +1,7 @@
 // The print-room renderer: four distinct board geometries, four HUD skins,
 // four physical dice vessels, plus dynamic pawns, previews and local effects.
 import {
-  W, H, G, LEFT_PANEL, RIGHT_PANEL, BOARD_RECT, BOARD_SURFACE, PLAY_BUTTONS,
+  W, H, G, LEFT_PANEL, RIGHT_PANEL, BOARD_RECT, BOARD_SURFACE, BOARD_SCALE_X, BOARD_SCALE_Y, PLAY_BUTTONS,
   DICE_TRAY, TUBE_RECT, TUBE_CENTER, SETTLEMENT_PANEL, SETTLEMENT_BTNS,
   FONT_BRUSH, FONT_MINCHO, currentBoard, pawnPosition, nodeCenter,
 } from './state.js';
@@ -690,37 +690,65 @@ function buildSceneCache(boardIndex) {
   const g = c.getContext('2d');
   drawStageBackground(g);
   drawHeader(g, board);
+  drawTableTop(g, board);
   drawBoardFrame(g);
   g.save();
-  g.translate(BOARD_RECT.x, BOARD_RECT.y);
+  g.translate(BOARD_SURFACE.x, BOARD_SURFACE.y);
+  g.scale(BOARD_SCALE_X, BOARD_SCALE_Y);
   drawStaticBoard(g, board);
   g.restore();
   return c;
 }
 
-function drawBoardFrame(ctx) {
-  const x = BOARD_RECT.x - 7;
-  const y = BOARD_RECT.y - 7;
-  const w = BOARD_RECT.w + 14;
-  const h = BOARD_RECT.h + 14;
+function drawTableTop(ctx, board) {
+  const bx = BOARD_SURFACE.x;
+  const by = BOARD_SURFACE.y - 22;
+  const bw = BOARD_SURFACE.w;
+  const bh = BOARD_SURFACE.h;
+  // V2: 2.5D black-lacquer tatami table with a gold-brass rim and thick
+  // paper stack.  A soft vignette anchors the print surface in depth.
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.55)';
-  ctx.shadowBlur = 18;
+  ctx.fillStyle = '#171310';
+  ctx.fillRect(bx - 48, by, bw + 96, bh + 24);
+  const g = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+  g.addColorStop(0, '#2b2017');
+  g.addColorStop(0.5, '#1d1713');
+  g.addColorStop(1, '#15110e');
+  ctx.fillStyle = g;
+  ctx.fillRect(bx - 24, by, bw + 48, bh + 16);
+  // Umkirch / tatami edge shadow.
+  const vg = ctx.createRadialGradient(bx + bw / 2, by + bh / 2, bw * 0.2, bx + bw / 2, by + bh / 2, bw * 0.58);
+  vg.addColorStop(0, 'rgba(255,255,255,0.07)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.38)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(bx - 24, by, bw + 48, bh + 16);
+  ctx.restore();
+}
+
+function drawBoardFrame(ctx) {
+  const x = BOARD_SURFACE.x - 16;
+  const y = BOARD_SURFACE.y - 16;
+  const w = BOARD_SURFACE.w + 32;
+  const h = BOARD_SURFACE.h + 32;
+  ctx.save();
+  // 2.5D paper thickness + raised bevel.
   ctx.fillStyle = '#2a1b12';
+  ctx.fillRect(x, BOARD_SURFACE.y + BOARD_SURFACE.h, w, 20);
+  ctx.fillRect(x, y, 20, h);
+  ctx.fillStyle = boardPaperTint();
   ctx.fillRect(x, y, w, h);
-  ctx.shadowColor = 'transparent';
-  const g = ctx.createLinearGradient(x, y, x + w, y + h);
-  g.addColorStop(0, '#7c512d');
-  g.addColorStop(0.3, '#3d2718');
-  g.addColorStop(0.7, '#6d4526');
-  g.addColorStop(1, '#2a1a11');
-  ctx.strokeStyle = g;
+  ctx.strokeStyle = '#8d6c37';
   ctx.lineWidth = 6;
   ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
   ctx.strokeStyle = 'rgba(218,178,103,0.55)';
-  ctx.lineWidth = 0.8;
-  ctx.strokeRect(x + 8, y + 8, w - 16, h - 16);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 9, y + 9, w - 18, h - 18);
   ctx.restore();
+}
+
+function boardPaperTint() {
+  const board = currentBoard();
+  return board.paper || '#efe0bd';
 }
 
 /* ------------------------------------------------------------------ */
@@ -1775,17 +1803,18 @@ function drawTokenBadges(ctx, board) {
   ctx.save();
   for (const node of board.nodes) {
     if (!node.tokens || (tokens & node.tokens) === 0) continue;
-    const x = BOARD_RECT.x + node.x + node.w - 12;
-    const y = BOARD_RECT.y + node.y + 11;
+    const c = nodeCenter(node);
+    const x = c.x + node.w * BOARD_SCALE_X - 12;
+    const y = c.y - node.h * BOARD_SCALE_Y / 2 + 11;
     ctx.fillStyle = 'rgba(178,58,43,0.95)';
     ctx.beginPath();
-    ctx.arc(x, y, 8, 0, TAU);
+    ctx.arc(x, y, 9, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = 'rgba(250,231,190,0.8)';
-    ctx.lineWidth = 0.8;
+    ctx.lineWidth = 1;
     ctx.stroke();
     ctx.fillStyle = '#f8e9c4';
-    font(ctx, 6.4, '700', true);
+    font(ctx, 8, '700', true);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(node.tokenLabel?.slice(0, 1) || '備', x, y);
@@ -1798,7 +1827,7 @@ function drawHover(ctx, board) {
   const node = board.nodes[G.hoverNode];
   if (!node) return;
   ctx.save();
-  ctx.translate(BOARD_RECT.x + node.x + node.w / 2, BOARD_RECT.y + node.y + node.h / 2);
+  const _c = nodeCenter(node); ctx.translate(_c.x, _c.y);
   ctx.rotate(node.tilt || 0);
   ctx.strokeStyle = 'rgba(226,187,99,0.9)';
   ctx.lineWidth = 2;
@@ -1912,25 +1941,42 @@ export function drawPlaying(ctx, time) {
     sceneCacheBoard = G.boardIdx;
   }
   const board = currentBoard();
-  ctx.drawImage(sceneCache, 0, 0);
-  drawLeftPanelSkin(ctx, board, false);
-  drawRightPanelSkin(ctx, board, false);
-  drawPreviewArcs(ctx, board);
-  drawTokenBadges(ctx, board);
-
-  // Draw the non-human pawn first when both share a square.
-  const human = G.match?.humanSide ?? 0;
-  const turn = G.match?.turn ?? 0;
-  const order = [1 - human, human];
-  for (const side of order) {
-    const p = animPawn(side, time);
-    drawPawn(ctx, side, p.x, p.y, time);
+  const cam = G.camera;
+  // V2: camera zoom & follow over the board layer only.  The HUD and dice
+  // tray are drawn afterwards in screen-fixed coordinates.
+  if (cam && (G.phase === 'MOVE' || G.phase === 'ANIM')) {
+    ctx.save();
+    ctx.translate(cam.focus.x, cam.focus.y);
+    ctx.scale(cam.zoom, cam.zoom);
+    ctx.translate(-cam.focus.x, -cam.focus.y);
+    ctx.drawImage(sceneCache, 0, 0);
+    drawPreviewArcs(ctx, board);
+    drawTokenBadges(ctx, board);
+    const human = G.match?.humanSide ?? 0;
+    const order = [1 - human, human];
+    for (const side of order) {
+      const p = animPawn(side, time);
+      drawPawn(ctx, side, p.x, p.y, time);
+    }
+    drawHover(ctx, board);
+    drawEffects(ctx);
+    ctx.restore();
+  } else {
+    ctx.drawImage(sceneCache, 0, 0);
+    drawRightPanelSkin(ctx, board, false);
+    drawPreviewArcs(ctx, board);
+    drawTokenBadges(ctx, board);
+    const human = G.match?.humanSide ?? 0;
+    const order = [1 - human, human];
+    for (const side of order) {
+      const p = animPawn(side, time);
+      drawPawn(ctx, side, p.x, p.y, time);
+    }
+    drawHover(ctx, board);
+    drawEffects(ctx);
   }
-  drawHover(ctx, board);
-  drawEffects(ctx);
   drawStatusToast(ctx);
   if (G.phase === 'ANIM' || (G.tube.shake || 0) > 0.01) {
-    // The board itself never jitters; only the dice vessel does.
     ctx.save();
     ctx.globalAlpha = 0.18;
     ctx.fillStyle = '#e4c477';
