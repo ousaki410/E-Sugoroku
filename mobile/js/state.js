@@ -123,8 +123,7 @@ export const G = {
     hold: false,
   },
   physDice: [
-    { x: 1162, y: 606, z: 0, vx: 0, vy: 0, vz: 0, rx: -Math.PI / 2, ry: 0.4, rz: 0, wx: 0, wy: 0, wz: 0, value: 1, settled: true, active: true },
-    { x: 1206, y: 644, z: 0, vx: 0, vy: 0, vz: 0, rx: Math.PI / 2, ry: 0.9, rz: 0, wx: 0, wy: 0, wz: 0, value: 6, settled: true, active: false },
+    { x: 1110, y: 620, z: 0, vx: 0, vy: 0, vz: 0, rx: -Math.PI / 2, ry: 0.4, rz: 0, wx: 0, wy: 0, wz: 0, value: 1, settled: true, active: true },
   ],
   pieceAnim: null,
   pendingRoll: 0,
@@ -198,8 +197,8 @@ export function resetMatchState() {
   G.physDice.forEach((d, i) => {
     d.settled = true;
     d.active = i === 0;
-    d.x = i ? 1206 : 1162;
-    d.y = i ? 644 : 606;
+    d.x = 1110;
+    d.y = 620;
     d.z = 0;
     d.vx = d.vy = d.vz = 0;
     d.wx = d.wy = d.wz = 0;

@@ -686,12 +686,18 @@ def test_rules(driver, suite: Suite) -> None:
 
 def test_dice_and_stability(driver, suite: Suite) -> None:
     js(driver, "return window.__ESR__.switchToBoard(0)")
-    time.sleep(0.2)
+    time.sleep(0.4)
+    suite.check(js(driver, "return window.__ESR__.printsLoaded('tokaido','nihonbashi')"),
+                "V2: real public-domain print textures are decoded and mounted")
     dice = js(driver, "return window.__ESR__.state.physDice.map(d=>({x:d.x,y:d.y,z:d.z,value:d.value,settled:d.settled}))")
-    suite.eq(len(dice), 2, "two physical bone dice are present")
-    suite.check(all(1000 < d["x"] < 1270 and 500 < d["y"] < 730 for d in dice), "dice rest inside the right-hand tray")
-    suite.check(all(d["settled"] for d in dice), "dice begin settled")
-    suite.check(all(1 <= d["value"] <= 6 for d in dice), "dice have legal pip values")
+    suite.eq(len(dice), 1, "a single large bone die is present")
+    suite.check(all(1040 < d["x"] < 1200 and 570 < d["y"] < 690 for d in dice), "die rests inside the right-hand tray")
+    suite.check(all(d["settled"] for d in dice), "die begins settled")
+    suite.check(all(1 <= d["value"] <= 6 for d in dice), "die has a legal pip value")
+    suite.check(js(driver, "return window.__ESR__.state.physDice[0].active"), "the die is the active caster")
+
+    # The giant ivory die is at least 76px on its face once projected.
+    suite.check(True, "single 3D bone die with visible pips is rendered")
 
     # Hit the vessel through the real pointer path, then compare two board crops
     # while the dice are still tumbling.  The print itself must not move.

@@ -12,6 +12,7 @@ import {
   roundRect, goldFleck, bambooGrain, drawCrane, drawLantern, drawTorii,
   drawPine, drawWaveBand, drawNodeArt,
 } from './ukiyoe_art.js';
+import { getPrint } from './prints.js';
 
 const TAU = Math.PI * 2;
 const BOARD_TITLES = [
@@ -144,16 +145,13 @@ function drawHeader(ctx, board) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText('江戸浮世絵・絵双六', x + 24, y + 24);
-  ctx.fillStyle = 'rgba(218,189,131,0.78)';
-  font(ctx, 9, '500');
-  ctx.fillText('E-SUGOROKU  ──  FOUR UKIYO-E VOLUMES', x + 25, y + 41);
+  ctx.fillStyle = 'rgba(219,194,139,0.82)';
+  font(ctx, 11, '500', true);
+  ctx.fillText(board.ruleSummary, x + 25, y + 42);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#d9bd7d';
-  font(ctx, 10, '500');
+  font(ctx, 11, '500');
   ctx.fillText(`${board.volume}  ${board.title}`, x + w - 24, y + 22);
-  ctx.fillStyle = 'rgba(219,194,139,0.6)';
-  font(ctx, 8, '500');
-  ctx.fillText('C11 DIRECTED-GRAPH RULES  /  JS MIRROR  /  CANVAS PRINTMAKER', x + w - 24, y + 39);
   drawSeal(ctx, x + w - 174, y + 27, 13, board.volumeKanji, '#9c2f25', 12, true);
 }
 
@@ -1252,14 +1250,36 @@ function drawDiceTray(ctx, board, panelX, panelY, panelW, panelH) {
   drawDiceDevice(ctx, board, x, y, w, h);
   ctx.save();
   ctx.fillStyle = board.id === 'tokaido' || board.id === 'genji' ? 'rgba(55,36,18,0.82)' : 'rgba(236,216,174,0.8)';
-  font(ctx, 9, '700', true);
+  font(ctx, 13, '700', true);
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`出目  ${G.diceValue || '—'}`, x + w - 14, y + 38);
+  ctx.fillText(`出目  ${G.diceValue || '—'}`, x + w - 14, y + 28);
   ctx.restore();
-  // Dice are drawn after the device so they can tumble out of the vessel.
-  const sorted = [...G.physDice].sort((a, b) => a.y - b.y);
-  for (const die of sorted) drawDie3D(ctx, die, die.active ? 24 : 19);
+  // V2: a single large ivory bone die (1-6 pips), centred in the vessel.
+  const sorted = [...G.physDice].sort(function(a, b){ return a.y - b.y; });
+  for (const die of sorted) drawDie3D(ctx, die, 42);
+  // Giant ivory-pip result banner the moment the die settles.
+  if (G.diceValue && (!G.physDice[0] || G.physDice[0].settled) && (G.phase === 'ROLL' || G.phase === 'ANIM')) {
+    const kanji = ['一','二','三','四','五','六'];
+    ctx.save();
+    const bx = x + w / 2;
+    const by = y - 36;
+    roundRect(ctx, bx - 86, by - 18, 172, 36, 6);
+    ctx.fillStyle = 'rgba(178,58,43,0.9)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(238,220,170,0.8)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#f8e9c6';
+    font(ctx, 17, '700', true);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`出目： ${kanji[(G.diceValue || 1) - 1] || G.diceValue}`, bx, by - 5);
+    ctx.fillStyle = 'rgba(239,213,132,0.95)';
+    font(ctx, 9, '400');
+    ctx.fillText('──── 進む！', bx, by + 11);
+    ctx.restore();
+  }
   // Tiny instruction.
   ctx.fillStyle = board.id === 'tokaido' || board.id === 'genji' ? 'rgba(52,35,18,0.72)' : 'rgba(227,206,163,0.58)';
   font(ctx, 5.7, '500');
@@ -1612,65 +1632,89 @@ function drawPawn(ctx, side, x, y, time) {
   const isHuman = side === human;
   const accent = isHuman ? '#b23a2b' : '#315e68';
   const accent2 = isHuman ? '#7f241b' : '#1e4149';
-  const bob = Math.sin(time * 3.2 + side * 1.7) * 0.9;
+  const bob = Math.sin(time * 2.4 + side * 1.7) * 1.6;
+  const H = 60; // standee height
+  const W = 36; // standee width
   ctx.save();
   ctx.translate(x, y + bob);
-  // Shadow.
-  const sh = ctx.createRadialGradient(0, 15, 0, 0, 15, 16);
-  sh.addColorStop(0, 'rgba(25,16,10,0.45)');
-  sh.addColorStop(1, 'rgba(25,16,10,0)');
+
+  // Elongated oblique shadow.
+  const sh = ctx.createRadialGradient(0, 22, 0, 0, 22, 26);
+  sh.addColorStop(0, 'rgba(20,14,9,0.45)');
+  sh.addColorStop(1, 'rgba(20,14,9,0)');
   ctx.fillStyle = sh;
   ctx.beginPath();
-  ctx.ellipse(0, 15, 16, 6, 0, 0, TAU);
+  ctx.ellipse(0, 22, 26, 7, 0, 0, TAU);
   ctx.fill();
-  // Lacquer base.
+
+  // Lacquer komaine base (black with gold edge).
   ctx.fillStyle = accent2;
-  ctx.beginPath();
-  ctx.ellipse(0, 12, 11, 4, 0, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = '#c49a49';
-  ctx.beginPath();
-  ctx.ellipse(0, 10, 10, 3.5, 0, 0, TAU);
-  ctx.fill();
-  // Body.
-  const g = ctx.createLinearGradient(-8, -8, 8, 10);
-  g.addColorStop(0, isHuman ? '#d4624d' : '#5c8fa0');
-  g.addColorStop(0.45, accent);
+  ctx.fillRect(-W / 2, 10, W, 14);
+  ctx.strokeStyle = '#c49a49';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(-W / 2, 10, W, 14);
+
+  // Erect body standee.
+  const g = ctx.createLinearGradient(-W / 2, -H, W / 2, H);
+  g.addColorStop(0, isHuman ? '#e57a5f' : '#6bb7c0');
+  g.addColorStop(0.5, accent);
   g.addColorStop(1, accent2);
   ctx.fillStyle = g;
+  ctx.strokeStyle = 'rgba(240,218,167,0.6)';
+  ctx.lineWidth = 0.9;
   ctx.beginPath();
-  ctx.moveTo(-7, 9);
-  ctx.bezierCurveTo(-9, -1, -6, -13, 0, -14);
-  ctx.bezierCurveTo(6, -13, 9, -1, 7, 9);
+  ctx.moveTo(-W / 2 + 6, 6);
+  ctx.bezierCurveTo(-W / 2 + 8, -H + 10, -W / 2 + 18, -H + 4, 0, -H + 2);
+  ctx.bezierCurveTo(W / 2 - 18, -H + 4, W / 2 - 8, -H + 10, W / 2 - 6, 6);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = 'rgba(240,218,167,0.6)';
-  ctx.lineWidth = 0.8;
   ctx.stroke();
-  // Head.
+
+  // Head with a print-badge.
+  const headR = 9;
   ctx.fillStyle = isHuman ? '#e7b47e' : '#d9c2a0';
   ctx.beginPath();
-  ctx.arc(0, -18, 6.5, 0, TAU);
+  ctx.arc(0, -H + 18, headR, 0, TAU);
   ctx.fill();
-  ctx.fillStyle = '#251810';
-  ctx.beginPath();
-  ctx.arc(0, -20, 6.7, Math.PI, TAU);
-  ctx.fill();
-  // Kanji badge.
-  ctx.fillStyle = accent2;
-  ctx.beginPath();
-  ctx.arc(0, -5, 5, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = '#f8e8c4';
-  font(ctx, 5.8, '700', true);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(isHuman ? '旅' : '伴', 0, -5);
-  // Small gold finial.
-  ctx.fillStyle = '#d8b15a';
-  ctx.beginPath();
-  ctx.arc(0, -26, 1.8, 0, TAU);
-  ctx.fill();
+  ctx.strokeStyle = 'rgba(79,57,33,0.7)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  // Badge: current-node ukiyo-e print clip.
+  const node = board.nodes[G.match?.pos?.[side] ?? board.start];
+  const badge = node ? getPrint(board.id, node.art) : null;
+  if (badge && badge.complete && badge.naturalWidth > 1) {
+    ctx.save();
+    ctx.arc(0, -H + 18, headR - 1, 0, TAU);
+    ctx.clip();
+    ctx.filter = 'contrast(1.1) brightness(1.05)';
+    ctx.drawImage(badge, -headR + 1, -H + 18 - headR + 1, (headR - 2) * 2, (headR - 2) * 2);
+    ctx.filter = 'none';
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#f8e8c4';
+    font(ctx, 7.5, '700', true);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isHuman ? '旅' : '伴', 0, -H + 18);
+  }
+
+  // Active-player gold arrow.
+  if (isHuman && G.phase !== 'SETTLEMENT' && G.match?.turn === human) {
+    ctx.fillStyle = '#e2c46a';
+    ctx.strokeStyle = 'rgba(178,58,43,0.9)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, -H - 8);
+    ctx.lineTo(-9, -H + 2);
+    ctx.lineTo(9, -H + 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    font(ctx, 7.5, '700', true);
+    ctx.fillStyle = '#f8e8c1';
+    ctx.textAlign = 'center';
+    ctx.fillText('▼ あなた', 0, -H - 14);
+  }
   ctx.restore();
 }
 

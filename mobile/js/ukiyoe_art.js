@@ -11,6 +11,8 @@ import {
   drawTokaidoScene, drawYokaiScene, drawWarriorScene, drawGenjiScene,
   drawGoalScene, drawCharmScene,
 } from './art_scenes.js';
+import { getPrint, getPrintURL } from './prints.js';
+import { BOARDS } from './boards.js';
 
 export {
   PALETTE, washiPaper, bokashi, drawPattern, drawSeal, drawKomae, drawCloud,
@@ -19,22 +21,38 @@ export {
 };
 
 export function drawNodeArt(ctx, boardIndex, node, x, y, w, h) {
+  const board = BOARDS[boardIndex];
+  const id = board ? board.id : 'tokaido';
+  // V2: prefer the real public-domain ukiyo-e print texture.
+  const img = getPrint(id, node.art);
   ctx.save();
   ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
-  if (node.kind === 'goal') {
-    drawGoalScene(ctx, node.art, x, y, w, h);
-  } else if (boardIndex === 0) {
-    drawTokaidoScene(ctx, node.art, x, y, w, h, node.palette || 0);
-  } else if (boardIndex === 1) {
-    drawYokaiScene(ctx, node.art, x, y, w, h, node.palette || 0);
-  } else if (boardIndex === 2) {
-    drawWarriorScene(ctx, node.art, x, y, w, h, node.palette || 0);
+  if (img && img.complete) {
+    ctx.filter = 'contrast(1.05) saturate(1.0)';
+    ctx.drawImage(img, x, y, w, h);
+    ctx.filter = 'none';
   } else {
-    drawGenjiScene(ctx, node.art, x, y, w, h, node.palette || 0);
+    if (node.kind === 'goal') {
+      drawGoalScene(ctx, node.art, x, y, w, h);
+    } else if (boardIndex === 0) {
+      drawTokaidoScene(ctx, node.art, x, y, w, h, node.palette || 0);
+    } else if (boardIndex === 1) {
+      drawYokaiScene(ctx, node.art, x, y, w, h, node.palette || 0);
+    } else if (boardIndex === 2) {
+      drawWarriorScene(ctx, node.art, x, y, w, h, node.palette || 0);
+    } else {
+      drawGenjiScene(ctx, node.art, x, y, w, h, node.palette || 0);
+    }
   }
   ctx.restore();
+}
+
+// Exposed for the debug print-room / V2 asset audit.
+export function nodePrintURL(boardIndex, node) {
+  const board = BOARDS[boardIndex];
+  return getPrintURL(board ? board.id : 'tokaido', node.art);
 }
 
 export function drawUkiyoeCard(ctx, card, x, y, w, h, options = {}) {
@@ -114,9 +132,18 @@ export function drawUkiyoeCard(ctx, card, x, y, w, h, options = {}) {
 }
 
 function drawCardArt(ctx, art, board, x, y, w, h) {
-  if (board === 0) drawTokaidoScene(ctx, art, x, y, w, h);
-  else if (board === 1) drawYokaiScene(ctx, art, x, y, w, h);
-  else if (board === 2) drawWarriorScene(ctx, art, x, y, w, h);
+  const boardObj = typeof board === 'number' ? BOARDS[board] : board;
+  const id = boardObj ? boardObj.id : 'tokaido';
+  const img = getPrint(id, art);
+  if (img && img.complete) {
+    ctx.filter = 'contrast(1.05) saturate(1.0)';
+    ctx.drawImage(img, x, y, w, h);
+    ctx.filter = 'none';
+    return;
+  }
+  if (typeof board === 'number' && board === 0) drawTokaidoScene(ctx, art, x, y, w, h);
+  else if (typeof board === 'number' && board === 1) drawYokaiScene(ctx, art, x, y, w, h);
+  else if (typeof board === 'number' && board === 2) drawWarriorScene(ctx, art, x, y, w, h);
   else drawGenjiScene(ctx, art, x, y, w, h);
 }
 

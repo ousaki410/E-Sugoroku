@@ -16,6 +16,7 @@ import {
   drawUI, drawGallery, drawSettlementScreen, TABS, SELECT_GALLERY,
 } from './ui_screens.js';
 import { audio } from './audio.js';
+import { loadAllPrints, isPrintLoaded } from './prints.js';
 
 const BOARD_STATUS = [
   ['東海道を進み、京・八百善の上りを目指す', '紅丸「泊」は一休み。名物格は跳び、上がりは点点一致。'],
@@ -310,7 +311,6 @@ function startRoll(forcedValue = null) {
   const value = forcedValue ?? (1 + Math.floor(Math.random() * 6));
   const target = targetRotation(value, Math.random() * 1.4 - 0.7);
   const die = G.physDice[0];
-  const spare = G.physDice[1];
   G.phase = 'ANIM';
   G.rollResolved = false;
   G.resolveTimer = 0;
@@ -319,23 +319,21 @@ function startRoll(forcedValue = null) {
   G.tube.tipped = true;
   G.rollPending = true;
   setStatus('賽が転がる ─ 目を読む', '盤面は静止したまま、骰だけが踊る');
-  for (const [d, active] of [[die, true], [spare, false]]) {
-    d.settled = false;
-    d.settling = false;
-    d.spinTime = 0;
-    d.x = TUBE_CENTER.x + 66 + (active ? 0 : 24);
-    d.y = TUBE_CENTER.y - 16 + (active ? 0 : 26);
-    d.z = 42 + Math.random() * 18;
-    d.vx = 24 + Math.random() * 40;
-    d.vy = -7 + Math.random() * 18;
-    d.vz = 26 + Math.random() * 22;
-    d.wx = 9 + Math.random() * 8;
-    d.wy = 7 + Math.random() * 9;
-    d.wz = 5 + Math.random() * 7;
-    d.target = targetRotation(active ? value : 1 + Math.floor(Math.random() * 6), Math.random() * 1.3 - 0.65);
-    d.value = active ? value : (1 + Math.floor(Math.random() * 6));
-    d.active = active;
-  }
+  die.settled = false;
+  die.settling = false;
+  die.spinTime = 0;
+  die.x = TUBE_CENTER.x + 14;
+  die.y = TUBE_CENTER.y - 10;
+  die.z = 42 + Math.random() * 18;
+  die.vx = 24 + Math.random() * 40;
+  die.vy = -7 + Math.random() * 18;
+  die.vz = 26 + Math.random() * 22;
+  die.wx = 9 + Math.random() * 8;
+  die.wy = 7 + Math.random() * 9;
+  die.wz = 5 + Math.random() * 7;
+  die.target = target;
+  die.value = value;
+  die.active = true;
   audio.throwDie();
   showStamp('投 骰', `${currentBoard().ui.diceDevice}より一擲`);
   return true;
@@ -411,11 +409,11 @@ function updateDice(dt) {
       die.rx += die.wx * dt;
       die.ry += die.wy * dt;
       die.rz += die.wz * dt;
-      // Tray walls.
-      const left = 1146;
-      const right = 1240;
+      // Tray walls (V2 single oversized die).
+      const left = 1050;
+      const right = 1190;
       const top = 574;
-      const bottom = 660;
+      const bottom = 680;
       if (die.x < left) { die.x = left; die.vx = Math.abs(die.vx) * 0.7; }
       if (die.x > right) { die.x = right; die.vx = -Math.abs(die.vx) * 0.7; }
       if (die.y < top) { die.y = top; die.vy = Math.abs(die.vy) * 0.7; }
@@ -432,8 +430,8 @@ function updateDice(dt) {
       die.rx += (tx - die.rx) * k;
       die.ry += (ty - die.ry) * k;
       die.rz += (tz - die.rz) * k;
-      die.x += (1162 + (die.active ? 0 : 44) - die.x) * k;
-      die.y += (604 + (die.active ? 0 : 38) - die.y) * k;
+      die.x += (1110 - die.x) * k;
+      die.y += (620 - die.y) * k;
       if (Math.abs(tx - die.rx) < 0.01 && Math.abs(ty - die.ry) < 0.01 && Math.abs(tz - die.rz) < 0.01) {
         die.rx = tx; die.ry = ty; die.rz = tz;
         die.settled = true;
@@ -466,7 +464,14 @@ function update(dt) {
   if (G.screen !== 'PLAYING') return;
   updateDice(dt);
   if (G.phase === 'MOVE' && G.pieceAnim) {
-    if (performance.now() - G.pieceAnim.t0 >= G.pieceAnim.duration) finishMove();
+    const anim = G.pieceAnim;
+    const p = Math.max(0, Math.min(1, (performance.now() - anim.t0) / anim.duration));
+    const seg = Math.min(anim.path.length - 2, Math.floor(p * (anim.path.length - 1)));
+    if (seg !== anim.lastSeg) {
+      anim.lastSeg = seg;
+      audio.step();
+    }
+    if (p >= 1) finishMove();
   }
   if (G.phase === 'ROLL' && G.match?.winner < 0 && G.match?.turn !== G.match?.humanSide) {
     if (G.aiTimer <= 0.001) {
@@ -759,10 +764,10 @@ function snapshot() {
     statusText: G.statusText,
     statusSub: G.statusSub,
     diceValue: G.diceValue,
-    dice: G.physDice.map(d => ({
-      x: d.x, y: d.y, z: d.z, vx: d.vx, vy: d.vy,
-      settled: d.settled, active: d.active,
-    })),
+    dice: [G.physDice[0]].map(function(d){
+      return {x:d.x,y:d.y,z:d.z,vx:d.vx,vy:d.vy,settled:d.settled,active:d.active,value:d.value};
+    }),
+    dieValue: G.diceValue,
     effects: G.effects.length,
     deviceRect: { ...TUBE_RECT },
     boardRect: { x: 190, y: 68, w: 800, h: 660 },
@@ -821,8 +826,10 @@ window.__ESR__ = {
   galleryCloseRect() { return { ...GALLERY_CLOSE }; },
   showGallery(on, tab = 'cards') { G.showGallery = !!on; G.galleryTab = tab; },
   invalidation() { invalidateScene(); },
+  printsLoaded(boardId, art) { return isPrintLoaded(boardId, art); },
 };
 
 setupInput();
 requestAnimationFrame(frame);
-setTimeout(() => document.body.classList.add('ready'), 320);
+loadAllPrints();
+setTimeout(() => document.body.classList.add('ready'), 800);
